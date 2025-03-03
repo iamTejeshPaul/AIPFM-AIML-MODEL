@@ -1,0 +1,12 @@
+google-generativeai==0.8.4
+streamlit
+pandas
+numpy
+tensorflow
+keras
+seaborn
+matplotlib
+joblib
+fpdf
+requests
+scikit-learn
