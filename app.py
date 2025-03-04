@@ -33,10 +33,15 @@ def fetch_user_data(user_id):
     url = FIREBASE_URL.format(user_id)
     response = requests.get(url)
     if response.status_code == 200:
-        return response.json()
+        user_data = response.json()
+        if user_data:
+            return user_data
+        else:
+            st.error(f"❌ No data found for user: {user_id}")
+            return None
     else:
         st.error(f"❌ Error fetching data for user: {user_id}")
-        return {}
+        return None
 
 # Extract Expense Data
 def extract_expense_data(user_data):
@@ -72,7 +77,7 @@ def extract_expense_data(user_data):
 def generate_bar_chart(user_id, category_data):
     ensure_directory_exists("charts")
     plt.figure(figsize=(10, 5))
-    
+
     bars = sns.barplot(x=list(category_data.keys()), y=list(category_data.values()), palette="coolwarm", edgecolor="black")
 
     # Annotate bars with the actual values
@@ -149,7 +154,6 @@ def spending_analysis(category_data, predicted_savings):
 
     return "\n".join(insights)
 
-
 # Function to calculate spending grade and savings grade
 def calculate_grades(predicted_savings, total_income, total_spending):
     # Calculate Savings Grade
@@ -193,13 +197,13 @@ def generate_pdf_report(user_id, total_income, total_spending, predicted_savings
     pdf.cell(200, 10, txt=f"Total Spending (Last 30 Days): INR {total_spending}", ln=True)
     pdf.cell(200, 10, txt=f"Goal Amount: INR {goal_amount}", ln=True)
     pdf.cell(200, 10, txt=f"Date Range: {start_date} to {end_date}", ln=True)
-    
+
     # Calculate grades and ratios
     savings_grade, spending_grade, spending_ratio = calculate_grades(predicted_savings, total_income, total_spending)
 
     pdf.cell(200, 10, txt=f"Spending Ratio: {spending_ratio:.2f}", ln=True)
     pdf.cell(200, 10, txt=f"Spending Grade: {spending_grade}", ln=True)
-    
+
     pdf.ln(10)
 
     pdf.set_font("Arial", style='B', size=10)
@@ -234,10 +238,10 @@ def generate_pdf_report(user_id, total_income, total_spending, predicted_savings
     output_dir = "generated_reports"
     ensure_directory_exists(output_dir)
     output_path = os.path.join(output_dir, f"{user_id}_report.pdf")
-    
+
     # Save the PDF
     pdf.output(output_path, "F")
-    
+
     # Return the file path
     return output_path
 
