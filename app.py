@@ -94,7 +94,6 @@ def generate_bar_chart(user_id, category_data):
     plt.close()
     return chart_path
 
-# Provide spending insights based on scenarios using Gemini API
 def get_gemini_spending_insights(category_data, total_spending):
     categories = ", ".join([f"{category}: {amount} INR" for category, amount in category_data.items()])
     prompt = f"""
@@ -110,7 +109,7 @@ def get_gemini_spending_insights(category_data, total_spending):
       "temperature": 1,
       "top_p": 0.95,
       "top_k": 40,
-      "max_output_tokens": 8192,
+      "max_output_tokens": 500,  # Limit the output to 500 words (approximated by token count)
       "response_mime_type": "text/plain",
     }
 
@@ -126,7 +125,9 @@ def get_gemini_spending_insights(category_data, total_spending):
     # Send the message to Gemini
     response = chat_session.send_message(prompt)
     if response.text:
-        return response.text.strip()
+        # Limit the response to 250 words
+        response_words = response.text.strip().split()[:250]
+        return " ".join(response_words)  # Return the first 250 words
     else:
         return "AI analysis failed. Please try again later."
 
