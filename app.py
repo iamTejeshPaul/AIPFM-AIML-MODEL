@@ -95,59 +95,40 @@ def generate_bar_chart(user_id, category_data):
     return chart_path
 
 def get_gemini_spending_insights(category_data, total_spending):
-    # Prepare the categories data as a string
     categories = ", ".join([f"{category}: {amount} INR" for category, amount in category_data.items()])
     
-    # Define the prompt for Gemini model with spending details and specific instructions
-    prompt = f"""
-    Analyze the following user spending data and provide personalized financial advice in 12 concise bullet points.
-
-    Categories: {categories}
-    Total Spending: {total_spending} INR
-
-    Format:
-    - Recommendation 1: [Single-line sentence]
-    - Recommendation 2: [Single-line sentence]
-    ...
-    - Recommendation 12: [Single-line sentence]
-
-    Each recommendation should be data-driven, specific, and focused on improving spending habits, savings, and financial goal alignment.
-    """
-
-    # Configuration for the generation process to get text insights
+    prompt = f"""Analyze the following user spending data and provide personalized financial advice in 12 concise bullet points.
+Categories: {categories}
+Total Spending: {total_spending} INR
+Format:
+- Recommendation 1: [Single-line sentence]
+- Recommendation 2: [Single-line sentence]
+...
+- Recommendation 12: [Single-line sentence]
+Each recommendation should be specific, data-driven, and focused on optimizing spending, boosting savings, and achieving goals."""
+    
     generation_config = {
         "temperature": 0.9,
         "top_p": 0.95,
         "top_k": 40,
-        "max_output_tokens": 600,  # Increased to allow 12 clear recommendations
+        "max_output_tokens": 600,
         "response_mime_type": "text/plain",
     }
 
-    # Start the chat session with Gemini model
     model = genai.GenerativeModel(model_name="gemini-1.5-flash", generation_config=generation_config)
     chat_session = model.start_chat(history=[])
-
-    # Send the prompt to generate insights
     response = chat_session.send_message(prompt)
-    
-    # Return response as-is (assumes output is already in required format)
-    if response.text:
-        return response.text.strip()
-    else:
-        return "AI analysis failed. Please try again later."
+
+    return response.text.strip() if response.text else "AI analysis failed. Please try again later."
 
 
 def spending_analysis(category_data, predicted_savings=None):
     total_spending = sum(category_data.values())
-
-    # If no spending data, return a message
     if total_spending == 0:
         return "No spending data available."
 
-    # Get AI-driven 12-point recommendation report
     ai_report = get_gemini_spending_insights(category_data, total_spending)
-
-    return f"📊 Financial Planning Report\n\nTotal Spending: {total_spending} INR\n\n{ai_report}"
+    return f"📊 Financial Planning Report | Total Spending: {total_spending} INR\n{ai_report}"
 
 
 
@@ -193,23 +174,19 @@ def ensure_directory_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-# Function to create the digitally signed note with timestamp and stamp
 def generate_signed_note_with_timestamp(pdf):
-    # Get the current date and time
-    current_datetime = datetime.now().strftime("%B %d, %Y %I:%M %p")  # Example: April 03, 2025 04:25 PM
+    # Get current date and time in compact format
+    current_datetime = datetime.now().strftime("%b %d, %Y %I:%M %p")  # e.g. Apr 10, 2025 03:45 PM
 
-    # Add the timestamp (in bold)
-    pdf.set_font("Arial", style='B', size=12)  # Bold for the timestamp
-    pdf.set_text_color(0, 0, 0)  # Set text color to black
-    pdf.cell(0, 10, current_datetime, ln=True, align='C')  # Add the timestamp in bold
-    pdf.ln(5)  # Add a small space after the timestamp
+    # Set compact styling
+    pdf.set_font("Arial", style='B', size=9)
+    pdf.set_text_color(100, 100, 100)
 
-    # Add the signature (e.g., Development Team text)
-    pdf.set_font("Arial", style='B', size=14)  # Bold for the signature text
-    pdf.cell(0, 10, "AI Powered Finance Manager Development Team", ln=True, align='C')
-    pdf.ln(10)  # Add space after the signature
+    # Add right-aligned timestamp and signature on one line
+    pdf.cell(0, 6, f"{current_datetime}  |  AI Powered Finance Manager", ln=True, align='R')
 
     return pdf
+
 
 # Updated function to generate the PDF report
 def generate_pdf_report(user_id, total_income, total_spending, predicted_savings, bar_chart_path, category_data, spending_advice, goal_amount, start_date, end_date):
