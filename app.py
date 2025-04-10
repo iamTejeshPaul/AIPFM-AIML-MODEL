@@ -95,52 +95,61 @@ def generate_bar_chart(user_id, category_data):
     return chart_path
 
 def get_gemini_spending_insights(category_data, total_spending):
+    # Prepare the categories data as a string
     categories = ", ".join([f"{category}: {amount} INR" for category, amount in category_data.items()])
+    
+    # Define the prompt for Gemini model with spending details and specific instructions
     prompt = f"""
-    Based on the following spending categories and predicted savings, provide detailed financial advice:
-    Categories: {categories}
-    Predicted Savings: {total_spending} INR
+    Analyze the following user spending data and provide personalized financial advice in 12 concise bullet points.
 
-    Please analyze the data and provide insights on how to optimize spending, prioritize savings, and offer general financial advice.
+    Categories: {categories}
+    Total Spending: {total_spending} INR
+
+    Format:
+    - Recommendation 1: [Single-line sentence]
+    - Recommendation 2: [Single-line sentence]
+    ...
+    - Recommendation 12: [Single-line sentence]
+
+    Each recommendation should be data-driven, specific, and focused on improving spending habits, savings, and financial goal alignment.
     """
 
-    # Create the model with generation config
+    # Configuration for the generation process to get text insights
     generation_config = {
-      "temperature": 1,
-      "top_p": 0.95,
-      "top_k": 40,
-      "max_output_tokens": 500,  # Limit the output to 500 words (approximated by token count)
-      "response_mime_type": "text/plain",
+        "temperature": 0.9,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 600,  # Increased to allow 12 clear recommendations
+        "response_mime_type": "text/plain",
     }
 
-    model = genai.GenerativeModel(
-      model_name="gemini-1.5-flash",
-      generation_config=generation_config,
-    )
+    # Start the chat session with Gemini model
+    model = genai.GenerativeModel(model_name="gemini-1.5-flash", generation_config=generation_config)
+    chat_session = model.start_chat(history=[])
 
-    chat_session = model.start_chat(
-      history=[]
-    )
-
-    # Send the message to Gemini
+    # Send the prompt to generate insights
     response = chat_session.send_message(prompt)
+    
+    # Return response as-is (assumes output is already in required format)
     if response.text:
-        # Limit the response to 250 words
-        response_words = response.text.strip().split()[:250]
-        return " ".join(response_words)  # Return the first 250 words
+        return response.text.strip()
     else:
         return "AI analysis failed. Please try again later."
 
-def spending_analysis(category_data, predicted_savings):
-    insights = []
+
+def spending_analysis(category_data, predicted_savings=None):
     total_spending = sum(category_data.values())
 
+    # If no spending data, return a message
     if total_spending == 0:
         return "No spending data available."
 
-    # AI-driven insights for spending using Gemini
-    ai_insights = get_gemini_spending_insights(category_data, total_spending)
-    insights.append(f"AIPFM Insights: \n{ai_insights}\n")
+    # Get AI-driven 12-point recommendation report
+    ai_report = get_gemini_spending_insights(category_data, total_spending)
+
+    return f"📊 Financial Planning Report\n\nTotal Spending: {total_spending} INR\n\n{ai_report}"
+
+
 
     # Add category-specific insights based on the percentages
     for category, amount in category_data.items():
@@ -179,20 +188,50 @@ def calculate_grades(predicted_savings, total_income, total_spending):
         spending_grade = "Poor"
 
     return savings_grade, spending_grade, spending_ratio
+# Function to ensure directory exists
+def ensure_directory_exists(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+# Function to create the digitally signed note with timestamp and stamp
+def generate_signed_note_with_timestamp(pdf):
+    # Get the current date and time
+    current_datetime = datetime.now().strftime("%B %d, %Y %I:%M %p")  # Example: April 03, 2025 04:25 PM
+
+    # Add the timestamp (in bold)
+    pdf.set_font("Arial", style='B', size=12)  # Bold for the timestamp
+    pdf.set_text_color(0, 0, 0)  # Set text color to black
+    pdf.cell(0, 10, current_datetime, ln=True, align='C')  # Add the timestamp in bold
+    pdf.ln(5)  # Add a small space after the timestamp
+
+    # Add the signature (e.g., Development Team text)
+    pdf.set_font("Arial", style='B', size=14)  # Bold for the signature text
+    pdf.cell(0, 10, "AI Powered Finance Manager Development Team", ln=True, align='C')
+    pdf.ln(10)  # Add space after the signature
+
+    return pdf
 
 # Updated function to generate the PDF report
 def generate_pdf_report(user_id, total_income, total_spending, predicted_savings, bar_chart_path, category_data, spending_advice, goal_amount, start_date, end_date):
     pdf = FPDF()
     pdf.add_page()
 
+    # Set the background gradient (Sky Blue to Grey)
+    pdf.set_fill_color(135, 206, 235)  # Sky Blue
+    pdf.rect(0, 0, 210, 297, 'F')  # Cover the entire page with color
+    
+    # Set the title with gradient
     pdf.set_font("Arial", style='B', size=18)
+    pdf.set_text_color(0, 0, 0)  # Black text
     pdf.cell(200, 10, txt="AI Powered Finance Manager", ln=True, align='C')
     pdf.ln(5)
 
+    # Subtitle
     pdf.set_font("Arial", size=14)
     pdf.cell(200, 10, txt=f"Spending Report for {user_id}", ln=True, align='C')
     pdf.ln(10)
 
+    # Report details
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt=f"Total Income: INR {total_income}", ln=True)
     pdf.cell(200, 10, txt=f"Total Spending (Last 30 Days): INR {total_spending}", ln=True)
@@ -207,6 +246,7 @@ def generate_pdf_report(user_id, total_income, total_spending, predicted_savings
 
     pdf.ln(10)
 
+    # Category table
     pdf.set_font("Arial", style='B', size=10)
     pdf.cell(40, 10, "Category", border=1, align='C')
     pdf.cell(40, 10, "Amount (INR)", border=1, align='C')
@@ -223,17 +263,17 @@ def generate_pdf_report(user_id, total_income, total_spending, predicted_savings
     pdf.ln(10)
 
     # Spending Analytics Box
-    pdf.set_font("Arial", style='B', size=12)
-    pdf.set_text_color(255, 0, 0)
-    pdf.cell(0, 10, "Spending Analytics:", border=1, ln=True, align='C')
-    pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(0, 10, spending_advice.encode('latin-1', 'ignore').decode('latin-1'), border=1)
+    pdf.set_font("Arial", style='B', size=14)  # Adjusted font size for better visibility
+    pdf.set_text_color(0, 0, 0)  # Changed text color to black for a cleaner look
+    pdf.cell(0, 10, "Spending Analytics", border=1, ln=True, align='C')  # Removed red color and used professional styling
     pdf.ln(5)
 
-    # Digitally Signed Note
-    pdf.set_font("Arial", style='B', size=12)
-    pdf.cell(0, 10, "AI Powered Finance Manager Development Team", ln=True, align='C')
-    pdf.ln(10)
+    pdf.set_font("Arial", size=12)  # Slightly smaller font for the content
+    pdf.multi_cell(0, 10, spending_advice.encode('latin-1', 'ignore').decode('latin-1'), border=1, align='L')  # Left-aligned text for easy reading
+    pdf.ln(5)
+
+    # Generate the digitally signed note with timestamp and AI team signature
+    pdf = generate_signed_note_with_timestamp(pdf)
 
     # Ensure directory exists and generate the file path
     output_dir = "generated_reports"
@@ -245,7 +285,6 @@ def generate_pdf_report(user_id, total_income, total_spending, predicted_savings
 
     # Return the file path
     return output_path
-
 # Streamlit UI
 def main():
     st.set_page_config(page_title="AI Finance Manager", layout="wide")
